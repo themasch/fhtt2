@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FHDO Timetable</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.no-icons.min.css">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.min.css">
+    <link rel="stylesheet" href="fhtt.css">
+</head>
+<body>
+    <div class="container not-visible">
+        <form class="form-inline top-panel">
+            <div class="form-group">
+                <label>Course of Study:</label>
+                <select class="form-control" name="CoS">
+                    <option value="none">choose</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Grade:</label>
+                <select class="form-control" name="grade">
+                    <option>all</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Group:</label>
+                <input class="form-control" type="text" size="1" name="group" />
+            </div>
+            <div class="checkbox">
+                <label for="hide" >
+                    <input type="checkbox" id="hide" value="yes" name="hide" /> hide others
+                </label>
+            </div>
+            <div class="handle">
+                <a class="icon-chevron-up"></a>
+            </div>
+        </form>
+        <div class="timetable">
+
+        </div>
+    </div>
+    <div class="load-box">
+        <div class="loading">
+            <i class="icon-spin icon-spinner"></i>
+            <span class="state">loading</span>
+        </div>
+    </div>
+<script>
+
+var stateEle = document.querySelector('.loading .state');
+var maps     = {
+    byId: {},
+    byCoS: {}
+};
+var CoS = [];
+var grades = [];
+function load(script, complete, prog) {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener('load', complete, false);
+    xhr.addEventListener('progress', prog, false);
+    xhr.open('GET', script, true);
+    xhr.send();
+}
+
+function generateIndex(data)
+{
+    for(var i=0;i<data.length;i++) {
+        var ele = data[i];
+        stateEle.innerHTML = 'indexing ' + i + '/' + (data.length);
+        maps.byId[ele.courseId] = ele
+        if(!maps.byCoS[ele.courseOfStudy]) {
+            maps.byCoS[ele.courseOfStudy] = [];
+            CoS.push(ele.courseOfStudy);
+        }
+        if(grades.indexOf(ele.grade) < 0) {
+            grades.push(ele.grade)
+        }
+        maps.byCoS[ele.courseOfStudy].push(ele);
+    }
+    grades.sort();
+}
+
+var weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+var hours = [ 830, 920, 1015, 1200, 1250, 1415, 1505, 1600, 1650, 1745];
+
+function renderOffTimeTable(data, letter, hideng) {
+    var cont = document.querySelector('.timetable');
+    cont.innerHTML = '';
+    var days = {};
+    data.sort(function(a, b) {
+        var wdIdxA = weekdays.indexOf(a.weekday);
+        var wdIdxB = weekdays.indexOf(b.weekday);
+        if(wdIdxA !== wdIdxB) {
+            return wdIdxA - wdIdxB
+        }
+        var timeDif = parseInt(a.timeBegin, 10) - parseInt(b.timeBegin, 10)
+        if(timeDif !== 0) {
+            return timeDif;
+        }
+
+        return a.name < b.name ? -1 : 1;
+    }).forEach(function(ele) {
+        if(hideng && letter && !inSet(ele.studentSet, letter)) {
+            return;
+        }
+        if(!days[ele.weekday]) {
+            days[ele.weekday] = [];
+        }
+        ele.Begin = toMin(ele.timeBegin)
+        ele.End = toMin(ele.timeEnd)
+        days[ele.weekday].push(ele)
+    })
+
+    for(var i=0;i<weekdays.length;i++) {
+        var div = document.createElement('div')
+        div.classList.add('panel')
+        div.classList.add('panel-default')
+        div.dataset['weekday'] = weekdays[i];
+
+        var caption = document.createElement('div');
+        caption.classList.add('panel-heading');
+        caption.innerHTML = weekdays[i];
+
+        var body = document.createElement('div');
+        body.classList.add('panel-body');
+        body.classList.add('row');
+
+        var dayEnd = 0;
+        if(days[weekdays[i]]) {
+            // render time col
+            var timeCol = document.createElement('div');
+            timeCol.classList.add('col-lg-1');
+            body.appendChild(timeCol);
+
+            var cols = []
+            for(var j=0;j<4;j++) {
+                var tmp = document.createElement('div');
+                tmp.classList.add('col-lg-2');
+                body.appendChild(tmp);
+                cols[j] = tmp;
+                cols[j]._endTime = 0;
+            }
+
+            days[weekdays[i]].forEach(function(ele) {
+                var lec = document.createElement('div');
+                var start = ele.Begin;
+                var end   = ele.End;
+                lec.classList.add('lecture')
+                if(letter && inSet(ele.studentSet, letter)) {
+                    lec.classList.add('highlight');
+                }
+                lec.innerHTML =
+                    '<strong>' +
+                        '[' + ele.courseType + '] '+
+                        ele.name +
+                    '</strong><br />' +
+                    ele.lecturerName + '<br />' +
+                    fmt(start) + ' - ' + fmt(end) + ' | ' +
+                    ele.roomId + ' | ' +
+                    ele.studentSet;
+
+                if(end > dayEnd) {
+                    dayEnd = end;
+                }
+                for(var j=0;j<4;j++) {
+                    if(cols[j]._endTime < start) {
+                        cols[j].appendChild(lec);
+                        var prev = cols[j]._endTime === 0 ? 510 : cols[j]._endTime;
+                        lec.style.marginTop = (start - prev)*2.5 + 'px'
+                        lec.style.height    = (end - start)*2.5 + 'px';
+                        lec.dataset['start'] = start;
+                        lec.dataset['end']   = end;
+                        cols[j]._endTime = end;
+                        break;
+                    }
+                }
+            });
+
+
+            var tbEnd = 510;
+            for(var h=0;h<hours.length;h++) {
+                var hor = toMin(hours[h])
+                if(hor > dayEnd) {
+                    break;
+                }
+                var timeBox = document.createElement('div');
+                timeBox.innerHTML =  fmt(hor)+ ' - ' + fmt(hor + 45);
+                timeBox.style.marginTop = (hor - tbEnd)*2.5 + 'px'
+                timeBox.style.height    = (45*2.5) + 'px';
+                timeCol.appendChild(timeBox);
+                tbEnd = hor + 45;
+            }
+        }
+
+        div.appendChild(caption);
+        div.appendChild(body);
+
+        cont.appendChild(div)
+    }
+}
+
+function toMin(inp) {
+    inp = parseInt(inp, 10)
+    var hr  = ~~(inp / 100);
+    var min = inp - (hr*100);
+    return hr * 60 + min;
+}
+
+function fmt(inp)
+{
+   return ~~(inp / 60) + ':' + ~~(inp % 60)
+}
+
+function inSet(set, letter)
+{
+    var match = set.toUpperCase().match(/([A-Z])\d?\-([A-Z])\d?/);
+    if(match) {
+        return letter.toUpperCase() >= match[1]
+                && letter.toUpperCase() <= match[2]
+    }
+}
+
+function renderUi()
+{
+    var cosSelect = document.querySelector('select[name=CoS]');
+    for(var i=0;i<CoS.length;i++) {
+        cosSelect.innerHTML += '<option>' + CoS[i] + '</option>';
+    }
+    cosSelect.addEventListener('change', updateTT, false);
+    var gradesSelect = document.querySelector('select[name=grade]');
+    for(var i=0;i<grades.length;i++) {
+        gradesSelect.innerHTML += '<option>' + grades[i] + '</option>';
+    }
+    gradesSelect.addEventListener('change', updateTT, false);
+
+
+    var groupinput = document.querySelector('input[name=group]');
+    groupinput.addEventListener('keyup', updateTT, false);
+    var hideinput = document.querySelector('input[name=hide]');
+    hideinput.addEventListener('change', updateTT, false);
+
+
+    function updateTT()
+    {
+        var data = maps.byCoS[cosSelect.value]
+                    ? maps.byCoS[cosSelect.value]
+                    : []
+        if(gradesSelect.value !== 'all') {
+            data = data.filter(function(ele) {
+                return  ele.grade == gradesSelect.value
+            })
+        }
+        renderOffTimeTable(data, groupinput.value, hideinput.checked)
+    }
+}
+
+load(
+    './timetable.json',
+    function(evt) {
+        stateEle.innerHTML = 'parsing'
+        var json = JSON.parse(this.responseText);
+        generateIndex(json);
+        renderUi();
+        document.querySelector('.load-box .loading').classList.add('done')
+        document.querySelector('.container').classList.remove('not-visible');
+        setTimeout(function() {
+            document.querySelector('.load-box').remove()
+        }, 500)
+    }
+)
+
+var panel = document.querySelector('.top-panel');
+document.querySelector('.top-panel .handle').addEventListener('click', function(evt) {
+    evt.preventDefault();
+    if(panel.classList.contains('collapsed')) {
+        panel.classList.remove('collapsed');
+    } else {
+        panel.classList.add('collapsed');
+    }
+    return false;
+}, false)
+
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+.load-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+.loading {
+    margin: auto;
+    margin-top: 10em;
+    text-align: center;
+    width: 300px;
+}
+.loading i {
+    display: block;
+    font-size: 400%;
+    margin: 0.25em;
+}
+.loading span {
+    color: gray;
+}
+.loading.done {
+    opacity: 0;
+    -webkit-transition: opacity 0.5s linear;
+}
+.container {
+    -webkit-transition: opacity 0.5s linear;
+}
+.container.not-visible {
+    opacity: 0;
+}
+.top-panel {
+    background-color: #f60;
+    padding: 1em;
+    float: left;
+    position: fixed;
+    -webkit-transition: top 0.25s linear;
+    color: white;
+    z-index: 9999;
+}
+.top-panel .handle {
+    margin: auto;
+    text-align: center;
+    width: 3em;
+    display: block;
+    bottom: -1em;
+    height: 20px;
+    position: relative;
+}
+.top-panel .handle a {
+    color: white;
+    text-decoration: none;
+}
+.top-panel.collapsed {
+    top: -90px;
+}
+.top-panel.collapsed .handle .icon-chevron-up:before {
+    content: "\f078";
+}
+.timetable {
+    margin-top: 2em;
+}
+.col-lg-1 {
+    width: 12%;
+}
+
+.col-lg-2 {
+    width: 20%;
+}
+.lecture {
+    border: 1px solid black;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    padding: 5px;
+}
+.lecture.highlight {
+    background-color: #f60;
+}
